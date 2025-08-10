@@ -1,0 +1,37 @@
+# Ignore Python cache / build files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+
+# Ignore venv and local environments
+.venv/
+env/
+venv/
+ENV/
+
+# Ignore Git & local configs
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Ignore test files
+tests/
+*.pytest_cache
+.tox/
+.nox/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore docs that aren't needed in container
+README.md
+*.md
+
+# Ignore environment files (handled via docker-compose env vars)
+.env
+.env.*
