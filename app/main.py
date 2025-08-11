@@ -2,6 +2,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import summarize
+from app.routes import copilot_chat
+from app.routes import chat_endpoint
 
 app = FastAPI(title="YouTube Transcript Summarizer + Chat")
 
@@ -16,6 +18,8 @@ app.add_middleware(
 
 # Register routes
 app.include_router(summarize.router, prefix="/api")
+app.include_router(copilot_chat.router, prefix="/api")
+app.include_router(chat_endpoint.router, prefix="/assistant")
 
 @app.get("/")
 async def root():
