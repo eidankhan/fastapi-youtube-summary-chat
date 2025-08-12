@@ -247,3 +247,116 @@ This ensures context is always available but increases:
 2. Backend responds with answer + follow-up suggestions.
 3. User clicks `"List the industries most affected by tariffs"`.
 4. Frontend sends **the same transcript** + new question to `/chat` for another round.
+
+---
+# Groq Chat API Integration
+
+This document describes the new **Groq API integration** in our FastAPI project.  
+It is designed as an alternative to OpenAI's API, allowing free or cheaper high-quality chat completions using the **Groq Cloud** service.
+
+## Overview
+
+We now support **two AI chat providers**:
+
+1. **OpenAI API** – Paid API, using `OPENAI_API_KEY`.
+2. **Groq API** – Free (for now) high-performance API using `GROQ_API_KEY`.
+
+Both APIs follow the same **request** and **response** object structure, making them interchangeable.
+
+## Environment Variables
+
+In your `.env` file, add:
+
+```env
+# Groq API
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+GROQ_MODEL=llama3-70b-8192
+
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+````
+
+## API Endpoint
+
+### POST `/api/chat-groq`
+
+**Request Body:**
+
+```json
+{
+  "action": "summarize",
+  "context": "You are a helpful assistant for summarizing YouTube videos.",
+  "question": "Summarize this conversation about AI and UBI.",
+  "history": []
+}
+```
+
+**Request Model:**
+
+```python
+class ChatRequest(BaseModel):
+    action: str
+    context: str
+    question: str
+    history: list = []
+```
+
+## Response
+
+**Example Response:**
+
+```json
+{
+  "action": "summarize",
+  "response": "The discussion focuses on how AI impacts the economy...",
+  "suggestions": [
+    "What are the pros and cons of universal basic income?",
+    "How can humans maintain relevance in an AI-driven world?",
+    "What government policies could support AI wealth distribution?"
+  ]
+}
+```
+
+**Response Model:**
+
+```python
+class ChatResponse(BaseModel):
+    action: str
+    response: str
+    suggestions: list
+```
+
+## Implementation Notes
+
+* The API:
+
+  * Sends context, history, and user question to **Groq API**.
+  * Requests the assistant to **return output in strict JSON format** with keys:
+
+    * `answer`
+    * `suggestions` (list of strings)
+  * Logs raw responses for debugging.
+  * Extracts `answer` and `suggestions` from JSON.
+  * Falls back to plain text if JSON parsing fails.
+
+## Logging
+
+We log:
+
+* **Raw Groq API responses** for debugging.
+* **Warnings** if JSON parsing fails.
+
+Example log snippet:
+
+```
+INFO:app.routes.groq_chat:Raw Groq API response: { ... }
+WARNING:app.routes.groq_chat:Failed to parse JSON, falling back to plain text.
+```
+
+## Usage in Docker
+
+No changes required in existing OpenAI configuration.
+Groq service is called directly via API – no local model downloads needed.
