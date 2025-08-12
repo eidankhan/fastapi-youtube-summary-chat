@@ -507,5 +507,78 @@ groq_session_<sessionId>:meta
 * **Missing API Key** — Logs warning and fails at model call.
 * **Token Overflow (413)** — Handled by trimming history before sending.
 * **Invalid JSON from Model** — Falls back to plain text with no suggestions.
+---
+
+## Visualizing Conversation Data in Redis
+
+After setting up Redis for storing conversation history, you can inspect and visualize the stored data.
+
+### Why Redis?
+Redis is an **in-memory key–value store** that’s extremely fast.  
+In our project, we use it to:
+- Store chat session history for quick retrieval.
+- Automatically expire old sessions using TTL (time-to-live).
+- Reduce load on the main database by keeping ephemeral data in memory.
+
+---
+
+### Option 1 – Redis Commander (simple & Docker-friendly)
+
+We used **[Redis Commander](https://github.com/joeferner/redis-commander)**, a lightweight web UI for browsing and editing Redis keys.
+
+#### Steps (Docker)
+
+1. **Add Redis Commander to `docker-compose.yml`:**
+
+```yaml
+redis-commander:
+  image: rediscommander/redis-commander:latest
+  container_name: redis_commander
+  environment:
+    - REDIS_HOSTS=local:redis:6379
+  ports:
+    - "8081:8081"
+  depends_on:
+    - redis
+````
+
+2. **Restart services:**
+
+```bash
+docker compose up -d
+```
+
+3. **Open the Redis Commander UI:**
 
 ```
+http://localhost:8081
+```
+
+4. **Browse & Edit Keys:**
+
+   * Keys are named in the format:
+
+     ```
+     <REDIS_PREFIX><SESSION_ID>
+     <REDIS_PREFIX><SESSION_ID>:meta
+     ```
+   * `:meta` key → session metadata (creation time, TTL, etc.).
+   * Main key → conversation messages in JSON format.
+   * You can view, edit, and delete values directly from the browser.
+
+#### Example
+
+```json
+myapp:123e4567-e89b-12d3-a456-426614174000
+[
+  {"role": "user", "content": "Summarize this video"},
+  {"role": "assistant", "content": "Here’s the summary..."}
+]
+
+myapp:123e4567-e89b-12d3-a456-426614174000:meta
+{
+  "created_at": "1698765432"
+}
+```
+
+Now you can watch your Redis data update in real time as your chat sessions run.
