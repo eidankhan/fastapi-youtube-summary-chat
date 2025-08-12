@@ -4,3 +4,4 @@ openai>=0.27.0
 python-dotenv>=1.0.0
 redis>=4.5.0
 httpx>=0.24.0
+tiktoken>=0.5.2

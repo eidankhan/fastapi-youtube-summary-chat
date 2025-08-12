@@ -360,3 +360,152 @@ WARNING:app.routes.groq_chat:Failed to parse JSON, falling back to plain text.
 
 No changes required in existing OpenAI configuration.
 Groq service is called directly via API – no local model downloads needed.
+
+# Conversational Chat with Groq + Redis
+
+This feature provides a **persistent conversational interface** with Groq’s LLaMA model (`llama3-70b-8192` by default), allowing:
+- Context-aware question answering (`qa`).
+- Automatic summarization of content (`summary`).
+- Content expansion/explanation (`expand`).
+- Session persistence across requests.
+- Automatic token-limit handling to prevent `413 Request Too Large` errors.
+
+
+## Architecture
+The system is composed of:
+- **Frontend**: Sends requests with a `sessionId` to preserve conversation history.
+- **Backend** (`service.py`): Orchestrates history retrieval, model calls, and response formatting.
+- **Redis**: Stores chat history and metadata with expiration.
+- **Groq API**: Processes requests using the OpenAI-compatible endpoint.
+
+## How It Works
+
+### 1. Session Handling
+- Each conversation has a unique `sessionId` (UUID).
+- If no `sessionId` is sent from the frontend, the backend creates one.
+- Metadata (`created_at`) and messages are stored in Redis with a **TTL** (time-to-live).
+
+### 2. Message Storage
+Messages are appended in JSON format:
+
+```json
+{ "role": "user", "content": "Hello" }
+{ "role": "assistant", "content": "Hi there!" }
+````
+
+History is automatically trimmed to a maximum (`MAX_HISTORY_MESSAGES`).
+
+### 3. Token Limit Handling
+
+Before sending messages to Groq, the history is **token-trimmed** using `tiktoken` to avoid exceeding Groq’s token per minute (TPM) limits.
+
+### 4. Supported Actions
+
+* **qa** — Answer a user question using context.
+* **summary** — Summarize given content.
+* **expand** — Expand and elaborate on given content.
+
+### 5. Model Output
+
+Expected in **JSON** format:
+
+```json
+{
+  "answer": "Main reply text.",
+  "suggestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
+}
+```
+
+If parsing fails, raw text is returned with empty suggestions.
+
+
+## Request Flow Diagram
+
+```plaintext
++-----------+       +------------+       +--------+       +-----------+
+|  Frontend | ----> |  Backend   | ----> | Redis  |       |   Groq    |
+| (Browser) |       | (FastAPI)  |       | Cache  |       |   API     |
++-----------+       +------------+       +--------+       +-----------+
+     |                    |                  |                 |
+     | Send POST /chat    |                  |                 |
+     | with sessionId     |                  |                 |
+     |------------------->|                  |                 |
+     |                    | Get history ---->|                 |
+     |                    |<-----------------|                 |
+     |                    | Append new msg   |                 |
+     |                    |----------------->|                 |
+     |                    | Call LLaMA model |---------------> |
+     |                    |<-----------------------------------|
+     |                    | Save assistant msg in Redis        |
+     |                    |----------------->|                 |
+     | Return JSON result |                  |                 |
+     |<-------------------|                  |                 |
+```
+
+
+## Environment Variables
+
+Add these to `.env`:
+
+```env
+GROQ_API_KEY=your_api_key_here
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+GROQ_MODEL=llama3-70b-8192
+
+REDIS_URL=redis://redis:6379/0
+GROQ_REDIS_PREFIX=groq_session_
+SESSION_TTL_SECONDS=3600
+```
+
+## Frontend Usage
+
+### Example: Summary
+
+```javascript
+const sessionId = localStorage.getItem("sessionId") || crypto.randomUUID();
+localStorage.setItem("sessionId", sessionId);
+
+await fetch(CHAT_API_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    sessionId,
+    action: "summary",
+    context: transcriptText,
+    question: "Summarize this YouTube video"
+  })
+});
+```
+
+### Example: Follow-up Question
+
+```javascript
+await fetch(CHAT_API_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    sessionId,
+    action: "qa",
+    context: transcriptData.transcript,
+    question
+  })
+});
+```
+
+## Redis Keys
+
+```
+groq_session_<sessionId>
+groq_session_<sessionId>:meta
+```
+
+* `meta` contains session metadata (e.g., `created_at`).
+* Main key stores an array of JSON messages.
+
+## Error Handling
+
+* **Missing API Key** — Logs warning and fails at model call.
+* **Token Overflow (413)** — Handled by trimming history before sending.
+* **Invalid JSON from Model** — Falls back to plain text with no suggestions.
+
+```

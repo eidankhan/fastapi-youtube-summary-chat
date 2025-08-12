@@ -6,6 +6,8 @@ from app.routes import copilot_chat
 from app.routes import chat_endpoint
 from app.routes import mock_chat
 from app.routes import groq_chat
+from app.conversational_groq import controller
+
 
 app = FastAPI(title="YouTube Transcript Summarizer + Chat")
 
@@ -24,6 +26,7 @@ app.include_router(copilot_chat.router, prefix="/api")
 app.include_router(chat_endpoint.router, prefix="/assistant")
 app.include_router(mock_chat.router, prefix="/mock")
 app.include_router(groq_chat.router, prefix="/api")
+app.include_router(controller.router)
 
 @app.get("/")
 async def root():
