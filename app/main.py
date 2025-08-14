@@ -8,6 +8,8 @@ from app.routes import mock_chat
 from app.routes import groq_chat
 from app.conversational_groq import controller
 from app.conversational_openai import controller as openai_controller     
+from app.conversational_ai import controller as conv_controller
+
 
 
 app = FastAPI(title="YouTube Transcript Summarizer + Chat")
@@ -29,6 +31,7 @@ app.include_router(mock_chat.router, prefix="/mock")
 app.include_router(groq_chat.router, prefix="/api")
 app.include_router(controller.router)
 app.include_router(openai_controller.router)
+app.include_router(conv_controller.router)
 
 @app.get("/")
 async def root():
